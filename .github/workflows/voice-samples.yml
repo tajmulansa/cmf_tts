@@ -1,0 +1,51 @@
+name: Voice Samples
+
+on:
+  workflow_dispatch:
+    inputs:
+      voices:
+        description: "Comma-separated voices (leave empty for the default set)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  samples:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install system packages
+        run: sudo apt-get update && sudo apt-get install -y espeak-ng ffmpeg
+
+      - name: Install Python packages
+        run: pip install -r requirements.txt
+
+      - name: Cache Kokoro model
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: kokoro-82m-v1
+
+      - name: Render samples
+        env:
+          VOICES: ${{ inputs.voices }}
+        run: |
+          if [ -z "$VOICES" ]; then unset VOICES; fi
+          python samples.py
+
+      - name: Commit samples
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add samples/
+          git commit -m "Voice samples" || echo "No changes"
+          git pull --rebase
+          git push
